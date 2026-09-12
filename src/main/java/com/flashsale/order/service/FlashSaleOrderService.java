@@ -1,4 +1,4 @@
-package main.java.com.flashsale.order.service;
+package com.flashsale.order.service;
 
 import com.flashsale.inventory.lock.InventoryLockManager;
 import com.flashsale.order.event.OrderEventProducer;

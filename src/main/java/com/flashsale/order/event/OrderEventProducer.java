@@ -1,4 +1,4 @@
-package main.java.com.flashsale.order.event;
+package com.flashsale.order.event;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
