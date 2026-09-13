@@ -3,6 +3,7 @@ package com.flashsale;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.kafka.annotation.EnableKafka;
+import org.springframework.scheduling.annotation.EnableScheduling; // Added missing import
 
 /**
  * Subsystem Name: Application Bootstrap Subsystem
@@ -11,6 +12,7 @@ import org.springframework.kafka.annotation.EnableKafka;
  */
 @SpringBootApplication
 @EnableKafka
+@EnableScheduling
 public class FlashSaleEngineApplication {
 
     public static void main(String[] args) {

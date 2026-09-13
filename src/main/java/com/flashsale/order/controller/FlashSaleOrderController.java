@@ -14,7 +14,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-@RestController
+
+@RestController("unifiedFlashSaleOrderController")
 @RequestMapping("/api/v1/flash-sale")
 public class FlashSaleOrderController {
 
