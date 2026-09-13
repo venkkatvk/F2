@@ -4,7 +4,7 @@ spring:
 
   # PostgreSQL Data Source Configuration
   datasource:
-    url: jdbc:postgresql://localhost:5432/flashsaledb
+    url: jdbc:postgresql://localhost:5433/flashsaledb
     username: flashuser
     password: flashpassword
     driver-class-name: org.postgresql.Driver
@@ -48,6 +48,45 @@ spring:
       retries: 3
     listener:
       ack-mode: MANUAL_IMMEDIATE
+  server:
+    port: 8080
 
-server:
-  port: 8080
+  # Isolate management endpoints on a dedicated internal port for security and resource isolation
+  management:
+    server:
+      port: 8081
+    endpoints:
+      web:
+        exposure:
+          include: "health,prometheus,metrics,info"
+        base-path: "/actuator"
+    endpoint:
+      health:
+        show-details: "when_authorized"
+        roles: "ROLE_ACTUATOR"
+        probes:
+          enabled: true # Enables K8s liveness (/actuator/health/liveness) and readiness (/actuator/health/readiness)
+        # CRITICAL FOR HIGH TPS: Caching prevents health scraping storms from hammering PostgreSQL/Redis/Kafka
+        cache:
+          time-to-live: 5s
+      prometheus:
+        access: "read_only"
+
+    health:
+      db:
+        enabled: true
+      redis:
+        enabled: true
+      kafka:
+        enabled: false # Disabled default auto-config to use optimized custom indicator below
+
+    metrics:
+      tags:
+        application: ${spring.application.name:flash-sale-engine}
+        env: ${SPRING_PROFILES_ACTIVE:prod}
+      distribution:
+        percentiles-histogram:
+          http.server.requests: true
+          resilience4j.circuitbreaker.calls: true
+        sla:
+          http.server.requests: 10ms, 50ms, 100ms, 200ms, 500ms

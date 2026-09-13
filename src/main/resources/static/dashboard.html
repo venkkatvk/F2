@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flash Sale - Live Traffic Simulator</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --border: #334155;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --green: #22c55e;
+            --blue: #3b82f6;
+            --purple: #a855f7;
+            --red: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', monospace, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding: 1.5rem; line-height: 1.5; }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+        h1 { font-size: 1.5rem; color: var(--blue); }
+        .live-tag { background: rgba(34, 197, 94, 0.2); color: var(--green); border: 1px solid var(--green); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.8rem; }
+
+        /* Metrics Counter Grid */
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .metric-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center; }
+        .metric-val { font-size: 1.8rem; font-weight: bold; margin-top: 0.2rem; }
+
+        /* Main Workspace Grid */
+        .workspace { display: grid; grid-template-columns: 1fr 1.5fr; gap: 1.5rem; }
+        @media (max-width: 900px) { .workspace { grid-template-columns: 1fr; } }
+
+        .panel { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.2rem; }
+        .panel-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+
+        /* Input Controls */
+        .form-group { margin-bottom: 0.8rem; }
+        label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.2rem; }
+        input { width: 100%; padding: 0.5rem; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 4px; }
+        
+        .btn-group { display: flex; gap: 0.5rem; margin-top: 1rem; }
+        button { flex: 1; padding: 0.6rem; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
+        button:hover { opacity: 0.9; }
+        .btn-single { background: var(--blue); color: white; }
+        .btn-burst { background: var(--purple); color: white; }
+
+        /* Live Terminal Console */
+        .console-box { background: #090d16; border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem; height: 320px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 0.85rem; }
+        .log-line { margin-bottom: 0.4rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.2rem; }
+        .log-success { color: var(--green); }
+        .log-error { color: var(--red); }
+        .log-info { color: var(--blue); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>Flash Sale Engine - Real-Time Simulator</h1>
+            <p style="color: var(--muted); font-size: 0.85rem;">Live Concurrency & Event Pipeline Telemetry</p>
+        </div>
+        <span class="live-tag">● ENGINE ACTIVE</span>
+    </header>
+
+    <!-- METRICS COUNTERS -->
+    <section class="metrics-grid">
+        <div class="metric-card">
+            <div style="color: var(--muted); font-size: 0.8rem;">TOTAL SENT</div>
+            <div class="metric-val" id="cnt-total" style="color: var(--blue);">0</div>
+        </div>
+        <div class="metric-card">
+            <div style="color: var(--muted); font-size: 0.8rem;">QUEUED (202 ACCEPTED)</div>
+            <div class="metric-val" id="cnt-success" style="color: var(--green);">0</div>
+        </div>
+        <div class="metric-card">
+            <div style="color: var(--muted); font-size: 0.8rem;">REJECTED / ERRORS</div>
+            <div class="metric-val" id="cnt-errors" style="color: var(--red);">0</div>
+        </div>
+        <div class="metric-card">
+            <div style="color: var(--muted); font-size: 0.8rem;">AVG LATENCY</div>
+            <div class="metric-val" id="cnt-latency" style="color: var(--purple);">0ms</div>
+        </div>
+    </section>
+
+    <!-- WORKSPACE -->
+    <main class="workspace">
+        <!-- SIMULATOR CONTROLS -->
+        <section class="panel">
+            <div class="panel-title">1. Traffic Generator Controls</div>
+            
+            <div class="form-group">
+                <label>Target Endpoint</label>
+                <input type="text" id="inp-url" value="http://localhost:8080/api/v1/flash-sale/orders" readonly>
+            </div>
+            <div class="form-group">
+                <label>User Prefix</label>
+                <input type="text" id="inp-user" value="USER_">
+            </div>
+            <div class="form-group">
+                <label>Product ID</label>
+                <input type="text" id="inp-product" value="PROD_FLASH_999">
+            </div>
+            <div class="form-group">
+                <label>Order Quantity</label>
+                <input type="number" id="inp-qty" value="1">
+            </div>
+
+            <div class="btn-group">
+                <button class="btn-single" onclick="sendSingleOrder()">Single Checkout</button>
+                <button class="btn-burst" onclick="sendBurstTraffic(20)">Burst Load (20 Req)</button>
+            </div>
+        </section>
+
+        <!-- LOG CONSOLE -->
+        <section class="panel">
+            <div class="panel-title" style="display:flex; justify-content:space-between;">
+                <span>2. Live Console Log</span>
+                <span style="font-size: 0.75rem; color: var(--muted); cursor: pointer;" onclick="clearConsole()">[Clear Log]</span>
+            </div>
+            <div class="console-box" id="console">
+                <div class="log-line log-info">[SYSTEM INITIALIZED] Ready to dispatch HTTP POST requests...</div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        let total = 0, success = 0, errors = 0, latencies = [];
+
+        async function sendOrderPayload(userId) {
+            const url = document.getElementById('inp-url').value;
+            const payload = {
+                userId: userId,
+                productId: document.getElementById('inp-product').value,
+                quantity: parseInt(document.getElementById('inp-qty').value),
+                price: 499.00
+            };
+
+            const startTime = performance.now();
+            total++;
+            updateMetricsUI();
+
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const latency = Math.round(performance.now() - startTime);
+                latencies.push(latency);
+
+                if (res.ok) {
+                    const data = await res.json();
+                    success++;
+                    logToConsole(`[HTTP ${res.status}] ${userId} ➔ ${data.orderId || 'QUEUED'} (${latency}ms)`, 'log-success');
+                } else {
+                    errors++;
+                    logToConsole(`[HTTP ${res.status}] ${userId} ➔ Checkout Failed (${latency}ms)`, 'log-error');
+                }
+            } catch (err) {
+                const latency = Math.round(performance.now() - startTime);
+                errors++;
+                logToConsole(`[NETWORK ERROR] Failed to connect to server (${latency}ms)`, 'log-error');
+            }
+            updateMetricsUI();
+        }
+
+        function sendSingleOrder() {
+            const randomId = document.getElementById('inp-user').value + Math.floor(1000 + Math.random() * 9000);
+            sendOrderPayload(randomId);
+        }
+
+        function sendBurstTraffic(count) {
+            logToConsole(`[SIMULATOR] Dispatching ${count} concurrent POST requests...`, 'log-info');
+            const prefix = document.getElementById('inp-user').value;
+            
+            for (let i = 0; i < count; i++) {
+                const userId = `${prefix}${Math.floor(1000 + Math.random() * 9000)}`;
+                setTimeout(() => sendOrderPayload(userId), i * 50); // Stagger requests by 50ms
+            }
+        }
+
+        function logToConsole(msg, cssClass) {
+            const consoleBox = document.getElementById('console');
+            const time = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = `log-line ${cssClass}`;
+            div.innerText = `[${time}] ${msg}`;
+            consoleBox.appendChild(div);
+            consoleBox.scrollTop = consoleBox.scrollHeight;
+        }
+
+        function updateMetricsUI() {
+            document.getElementById('cnt-total').innerText = total;
+            document.getElementById('cnt-success').innerText = success;
+            document.getElementById('cnt-errors').innerText = errors;
+            
+            if (latencies.length > 0) {
+                const avg = Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length);
+                document.getElementById('cnt-latency').innerText = `${avg}ms`;
+            }
+        }
+
+        function clearConsole() {
+            document.getElementById('console').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
