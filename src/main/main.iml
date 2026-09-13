@@ -7,5 +7,7 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="Maven: org.springframework:spring-web:6.1.4" level="project" />
+    <orderEntry type="library" name="Maven: org.redisson:redisson:3.27.2" level="project" />
   </component>
 </module>

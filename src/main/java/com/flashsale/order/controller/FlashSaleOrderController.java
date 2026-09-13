@@ -15,8 +15,8 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 
-@RestController("unifiedFlashSaleOrderController")
-@RequestMapping("/api/orders")
+@RestController
+@RequestMapping("/api/v1/orders")
 public class FlashSaleOrderController {
 
     private final IdempotencyService idempotencyService;
