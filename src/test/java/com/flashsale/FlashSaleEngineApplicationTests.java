@@ -1,13 +1,10 @@
-package com.flashsale.flash_sale_engine;
+package com.flashsale;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class FlashSaleEngineApplicationTests {
+class FlashSaleEngineApplicationTests extends AbstractIntegrationTest {
 
-	@Test
-	void contextLoads() {
-	}
-
+    @Test
+    void contextLoads() {
+    }
 }

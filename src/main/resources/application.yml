@@ -22,6 +22,11 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: always
 
   # Redis Configuration
   data:
@@ -48,45 +53,59 @@ spring:
       retries: 3
     listener:
       ack-mode: MANUAL_IMMEDIATE
+
+server:
+  port: 8080
+
+# Isolate management endpoints on a dedicated internal port for security and resource isolation
+management:
   server:
-    port: 8080
-
-  # Isolate management endpoints on a dedicated internal port for security and resource isolation
-  management:
-    server:
-      port: 8081
-    endpoints:
-      web:
-        exposure:
-          include: "health,prometheus,metrics,info"
-        base-path: "/actuator"
-    endpoint:
-      health:
-        show-details: "when_authorized"
-        roles: "ROLE_ACTUATOR"
-        probes:
-          enabled: true # Enables K8s liveness (/actuator/health/liveness) and readiness (/actuator/health/readiness)
-        # CRITICAL FOR HIGH TPS: Caching prevents health scraping storms from hammering PostgreSQL/Redis/Kafka
-        cache:
-          time-to-live: 5s
-      prometheus:
-        access: "read_only"
-
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: "health,prometheus,metrics,info"
+      base-path: "/actuator"
+  endpoint:
     health:
-      db:
+      show-details: "when_authorized"
+      roles: "ROLE_ACTUATOR"
+      probes:
         enabled: true
-      redis:
-        enabled: true
-      kafka:
-        enabled: false # Disabled default auto-config to use optimized custom indicator below
+      cache:
+        time-to-live: 5s
+    prometheus:
+      access: "read_only"
 
-    metrics:
-      tags:
-        application: ${spring.application.name:flash-sale-engine}
-        env: ${SPRING_PROFILES_ACTIVE:prod}
-      distribution:
-        percentiles-histogram:
-          http.server.requests: true
-          resilience4j.circuitbreaker.calls: true
-        sla:
-          http.server.requests: 10ms, 50ms, 100ms, 200ms, 500ms
+  health:
+    db:
+      enabled: true
+    redis:
+      enabled: true
+    kafka:
+      enabled: false
+
+  metrics:
+    tags:
+      application: ${spring.application.name:flash-sale-engine}
+      env: ${SPRING_PROFILES_ACTIVE:prod}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        resilience4j.circuitbreaker.calls: true
+      sla:
+        http.server.requests: 10ms, 50ms, 100ms, 200ms, 500ms
+
+resilience4j:
+  ratelimiter:
+    instances:
+      flashSaleRateLimiter:
+        limit-for-period: 50
+        limit-refresh-period: 1s
+        timeout-duration: 0
+  circuitbreaker:
+    instances:
+      redisCircuitBreaker:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s

@@ -1,168 +1,134 @@
-**TL;DR**
-Here is a comprehensive, production-grade `README.md` file designed for your project.
-It incorporates visual badges, clean setup instructions, clear architecture breakdowns, 
-and usage examples tailored specifically to your Spring Boot Flash Sale Engine codebase.
-```
-Explaining the Core Concepts**
+# Flash Sale Engine
 
-Distributed Locks (Redisson):** Imagine a single golden ticket inside a locked box. When 1,000 users reach for it at once,
-Redisson ensures only one user holds the key at a time, protecting inventory numbers from becoming negative.
-Transactional Outbox Pattern:** Instead of writing to the database and sending a Kafka message separately
-(where a network glitch could drop the message), the app saves both the order and the message inside the database together in a single transaction.
-A background worker then safely delivers the message to Kafka.
-```
----
-Flash Sale Engine
----
+High-concurrency event-driven microservice for limited-time sales. It combines distributed Redis locking, Postgres-backed inventory, a transactional outbox, Kafka event streaming, and real-time SSE telemetry.
 
-## 1. Short Description
-The **Flash Sale Engine** is a high-concurrency event-driven microservice built to handle massive spike traffic during limited-time sales events.
-Think of it as a virtual gatekeeper that ensures thousands of shoppers clicking "Buy Now" at the exact same millisecond never crash the system, 
-over-sell inventory, or trigger duplicate billing. It combines distributed locking, outbox event polling,
-and stream processing to deliver bulletproof consistency under heavy load.
-
----
-## Visual Workflow
-```
-[ Client Request ] ──> [ FlashSaleOrderController ] ──> [ Redisson Lock Guard ]
-
-│
-
-(Lock Acquired)
-
-│
-
-[ Postgres DB Outbox ]
-
-│
-
-[ Scheduled Outbox Poller ]
-
-│
-
-[ Kafka Event Topic ]
-
-│
-
-[ Order Event Consumer ]
+## Architecture
 
 ```
-## 2. Getting Started
----
-
-### Prerequisites
-
-Before running the application, ensure you have the following software installed on your machine:
-Java Development Kit (JDK 21)** or higher
-Apache Maven 3.8+**
-Docker & Docker Compose** (for containerized PostgreSQL, Redis, and Kafka infrastructure)
-
-### Installation Instructions
-
-Follow these steps to set up and start the Flash Sale Engine locally:
-
-1. **Clone the Repository:**
-  ```bash
- git clone [https://github.com/your-username/flash-sale-engine.git](https://github.com/your-username/flash-sale-engine.git)
-
- cd flash-sale-engine
+[ Client ] --> [ FlashSaleOrderController ]
+                    |
+                    v
+         [ Idempotency + Rate Limiter ]
+                    |
+                    v
+         [ Redisson Lock (per product) ]
+                    |
+                    v
+         [ OrderWriteService @Transactional ]
+           - decrement inventory (Postgres)
+           - save order (PENDING)
+           - stage outbox event (PENDING)
+                    |
+                    v
+         [ ScheduledOutboxPoller ]
+                    |
+                    v
+         [ Kafka: flash-sale-orders ]
+                    |
+                    v
+         [ OrderEventConsumer ]
+           - update order (CONFIRMED)
+           - broadcast SSE telemetry
 ```
 
-2. **Launch Infrastructure Containers:**
+## Prerequisites
 
-Start PostgreSQL, Redis, and Apache Kafka using the provided Docker Compose configuration:
+- JDK 21+
+- Maven 3.8+
+- Docker & Docker Compose
+
+## Getting Started
+
+### 1. Start infrastructure
 
 ```bash
 docker-compose up -d
-
 ```
-3. **Build the Application:**
 
-Compile the source code and download Maven dependencies:
+### 2. Build and run
 
 ```bash
-mvn clean compile
+mvn clean spring-boot:run
 ```
-4. **Run the Application:**
 
-Start the Spring Boot server:
+The API listens on **8080**. Actuator endpoints are on **8081**.
+
+## Configuration
+
+| Setting | Value |
+|---------|-------|
+| PostgreSQL URL | `jdbc:postgresql://localhost:5433/flashsaledb` |
+| PostgreSQL user / password | `flashuser` / `flashpassword` |
+| Redis | `localhost:6379` |
+| Kafka | `localhost:9092` |
+| API port | `8080` |
+| Actuator port | `8081` |
+
+Seed inventory: product `prod_flash_99` starts with 100 units (see `src/main/resources/data.sql`).
+
+## API Usage
+
+### Health check
 
 ```bash
-mvn spring-boot:run
+curl http://localhost:8081/actuator/health
 ```
 
-### Environment Configuration
-
-The application connects to standard infrastructure services running locally. 
-
-The standard configuration settings are maintained inside `src/main/resources/application.yml`:
-
-PostgreSQL Database URL:** `jdbc:postgresql://localhost:5432/flashsale`
-
-PostgreSQL Username / Password:** `postgres` / `postgres`
-
-Redis Host & Port:** `localhost:6379`
-
-Apache Kafka Bootstrap Servers:** `localhost:9092`
-
-Application Port:** `8080`
-
----
-
-## 3. Usage & Technical Context
-
-#### 1. Checking System Health (Actuator)
-Verify that Tomcat, database connections, and event queues are operational:
+### Submit an order
 
 ```bash
-curl http://localhost:8080/actuator/health
+curl -X POST http://localhost:8080/api/v1/orders \
+  -H "Content-Type: application/json" \
+  -H "X-Idempotency-Key: my-unique-key-123" \
+  -d '{
+        "userId": "user_9918",
+        "productId": "prod_flash_99",
+        "quantity": 1
+      }'
 ```
-*Expected Response:*
+
+**Response (202 Accepted):**
 
 ```json
-{
- "status": "UP"
-}
+{ "orderId": "ORD-a1b2c3d4", "status": "PENDING" }
 ```
 
-#### 2. Submitting a Flash Sale Order
+### HTTP status codes
 
-Submit an order placement request to the engine:
+| Status | Meaning |
+|--------|---------|
+| 202 | Order accepted, processing asynchronously |
+| 400 | Validation error (missing fields, quantity < 1) |
+| 409 | Insufficient stock or duplicate idempotency key in progress |
+| 429 | Lock contention or rate limit exceeded |
+| 503 | Circuit breaker open (downstream degraded) |
 
-```bash
+### Idempotency
 
-curl -X POST http://localhost:8080/api/v1/orders 
+Pass `X-Idempotency-Key` header with a unique value. Retries with the same key return the cached response without creating a duplicate order.
 
- -H "Content-Type: application/json" 
- -d '{
-       "userId": "user_9918",
-       "productId": "prod_7712",
-       "quantity": 1
-     }'
-```
-
-#### 3. Real-Time Telemetry SSE Stream
-
-Listen to real-time updates of processed orders and inventory status directly from your browser or terminal:
+### Live telemetry (SSE)
 
 ```bash
-
 curl -N http://localhost:8080/api/v1/telemetry/stream
-
 ```
 
-### Tech Stack
+Open the dashboard at [http://localhost:8080/dashboard.html](http://localhost:8080/dashboard.html).
 
-Core Language & Framework:** Java 21, Spring Boot 3.2.3
+## Tech Stack
 
-Concurrency & Distributed Locking:** Redisson 3.27.2 (Redis-backed concurrency control)
+- Java 21, Spring Boot 3.2.3
+- PostgreSQL, Spring Data JPA
+- Redis (Redisson locks + idempotency)
+- Apache Kafka
+- Resilience4j (rate limiter + circuit breaker)
+- Spring Boot Actuator + Prometheus
+- Testcontainers (integration tests)
 
-Message Broker & Event Streaming:** Apache Kafka 3.6.1
+## Running Tests
 
-Relational Database & Persistence:** PostgreSQL, Spring Data JPA, Hibernate ORM
+Requires Docker (Testcontainers spins up Postgres, Redis, and Kafka):
 
-Resilience Patterns:** Transactional Outbox Pattern, Redis-backed Idempotency Guard
-
-Monitoring & Telemetry:** Spring Boot Actuator, Server-Sent Events (SSE)
-
+```bash
+mvn test
 ```
