@@ -94,12 +94,19 @@ mvn spring-boot:run
 ### Environment Configuration
 
 The application connects to standard infrastructure services running locally. 
+
 The standard configuration settings are maintained inside `src/main/resources/application.yml`:
+
 PostgreSQL Database URL:** `jdbc:postgresql://localhost:5432/flashsale`
+
 PostgreSQL Username / Password:** `postgres` / `postgres`
+
 Redis Host & Port:** `localhost:6379`
+
 Apache Kafka Bootstrap Servers:** `localhost:9092`
+
 Application Port:** `8080`
+
 ---
 
 ## 3. Usage & Technical Context
