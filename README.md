@@ -154,9 +154,15 @@ curl -N http://localhost:8080/api/v1/telemetry/stream
 ### Tech Stack
 
 Core Language & Framework:** Java 21, Spring Boot 3.2.3
+
 Concurrency & Distributed Locking:** Redisson 3.27.2 (Redis-backed concurrency control)
+
 Message Broker & Event Streaming:** Apache Kafka 3.6.1
+
 Relational Database & Persistence:** PostgreSQL, Spring Data JPA, Hibernate ORM
+
 Resilience Patterns:** Transactional Outbox Pattern, Redis-backed Idempotency Guard
+
 Monitoring & Telemetry:** Spring Boot Actuator, Server-Sent Events (SSE)
+
 ```
