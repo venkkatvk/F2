@@ -15,7 +15,7 @@ A background worker then safely delivers the message to Kafka.
 Flash Sale Engine
 ---
 
-## Short Description
+## 1. Short Description
 The **Flash Sale Engine** is a high-concurrency event-driven microservice built to handle massive spike traffic during limited-time sales events.
 Think of it as a virtual gatekeeper that ensures thousands of shoppers clicking "Buy Now" at the exact same millisecond never crash the system, 
 over-sell inventory, or trigger duplicate billing. It combines distributed locking, outbox event polling,
