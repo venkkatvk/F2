@@ -1,4 +1,4 @@
-package com.flashsale.flash_sale_engine; // Must match the folder path com/flashsale!
+package com.flashsale;
 
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
