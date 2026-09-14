@@ -9,6 +9,7 @@ com\flashsale\inventory\lock\InventoryLockManager.class
 com\flashsale\order\service\OrderWriteService.class
 com\flashsale\order\resilience\IdempotencyService.class
 com\flashsale\order\controller\OrderApiExceptionHandler.class
+com\flashsale\config\KafkaConfig$KafkaConsumerConfig.class
 com\flashsale\order\consumer\OrderEntity.class
 com\flashsale\order\controller\FlashSaleOrderController$OrderRequest.class
 com\flashsale\FlashSaleEngineApplication.class
