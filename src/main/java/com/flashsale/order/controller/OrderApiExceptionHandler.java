@@ -1,50 +1,41 @@
-package com.flashsale.order.controller;
+package com.flashsale.order.consumer;
 
-import com.flashsale.inventory.InsufficientStockException;
-import com.flashsale.inventory.lock.InventoryLockException;
-import com.flashsale.order.resilience.RateLimitExceededException;
-import com.flashsale.order.resilience.ServiceDegradedException;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Map;
-import java.util.stream.Collectors;
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class OrderEventConsumer {
 
-@RestControllerAdvice
-public class OrderApiExceptionHandler {
+    private final IdempotencyService idempotencyService;
+    private final OrderFulfillmentService fulfillmentService;
 
-    @ExceptionHandler(InventoryLockException.class)
-    public ResponseEntity<Map<String, String>> handleLockException(InventoryLockException ex) {
-        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .body(Map.of("error", ex.getMessage()));
-    }
+    // The Listener waiting at the gates of the Kafka topic
+    @KafkaListener(topics = "order-events", groupId = "flash-sale-group")
+    @Transactional // Bound to the local database transaction!
+    public void consumeOrderEvent(OrderCreatedEvent event) {
+        
+        String uniqueEventId = event.getEventId(); 
 
-    @ExceptionHandler(InsufficientStockException.class)
-    public ResponseEntity<Map<String, String>> handleInsufficientStock(InsufficientStockException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(Map.of("error", ex.getMessage()));
-    }
+        log.info("Incoming pigeon! Received Event ID: {}", uniqueEventId);
 
-    @ExceptionHandler(RateLimitExceededException.class)
-    public ResponseEntity<Map<String, String>> handleRateLimit(RateLimitExceededException ex) {
-        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .body(Map.of("error", ex.getMessage()));
-    }
+        // 1. Check the Sacred Ledger (The Idempotency Gate)
+        if (idempotencyService.hasBeenProcessed(uniqueEventId)) {
+            // We have seen this before. Burn the duplicate decree!
+            log.warn("Duplicate detected for Event ID: {}. Ignoring safely.", uniqueEventId);
+            return; 
+        }
 
-    @ExceptionHandler(ServiceDegradedException.class)
-    public ResponseEntity<Map<String, String>> handleServiceDegraded(ServiceDegradedException ex) {
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(Map.of("error", ex.getMessage()));
-    }
+        // 2. Process the actual business logic safely
+        fulfillmentService.prepareShipment(event);
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException ex) {
-        String message = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                .collect(Collectors.joining(", "));
-        return ResponseEntity.badRequest().body(Map.of("error", message));
+        // 3. Mark the event as processed in the exact same transaction
+        idempotencyService.markAsProcessed(uniqueEventId);
+        
+        log.info("Successfully processed and recorded Event ID: {}", uniqueEventId);
     }
 }
