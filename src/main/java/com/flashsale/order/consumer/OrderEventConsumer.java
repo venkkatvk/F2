@@ -1,44 +1,41 @@
 package com.flashsale.order.consumer;
 
-import com.flashsale.order.event.OrderEventProducer.OrderCreatedEvent;
-import com.flashsale.telemetry.TelemetrySseController;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.support.Acknowledgment;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-@Service
+@Slf4j
+@Component
+@RequiredArgsConstructor
 public class OrderEventConsumer {
 
-    private static final Logger log = LoggerFactory.getLogger(OrderEventConsumer.class);
+    private final IdempotencyService idempotencyService;
+    private final OrderFulfillmentService fulfillmentService;
 
-    private final OrderRepository orderRepository;
-    private final TelemetrySseController telemetrySseController;
+    // The Listener waiting at the gates of the Kafka topic
+    @KafkaListener(topics = "order-events", groupId = "flash-sale-group")
+    @Transactional // Bound to the local database transaction!
+    public void consumeOrderEvent(OrderCreatedEvent event) {
+        
+        String uniqueEventId = event.getEventId(); 
 
-    public OrderEventConsumer(OrderRepository orderRepository, TelemetrySseController telemetrySseController) {
-        this.orderRepository = orderRepository;
-        this.telemetrySseController = telemetrySseController;
-    }
+        log.info("Incoming pigeon! Received Event ID: {}", uniqueEventId);
 
-    @KafkaListener(topics = "flash-sale-orders")
-    @Transactional
-    public void consumeOrderEvent(OrderCreatedEvent event, Acknowledgment ack) {
-        orderRepository.findById(event.orderId()).ifPresentOrElse(order -> {
-            if ("CONFIRMED".equals(order.getStatus())) {
-                ack.acknowledge();
-                return;
-            }
-            order.setStatus("CONFIRMED");
-            orderRepository.save(order);
-            telemetrySseController.broadcastTelemetryEvent(
-                    "Order confirmed: " + event.orderId() + " for product " + event.productId()
-            );
-            ack.acknowledge();
-        }, () -> {
-            log.warn("Received Kafka event for unknown orderId: {}", event.orderId());
-            ack.acknowledge();
-        });
+        // 1. Check the Sacred Ledger (The Idempotency Gate)
+        if (idempotencyService.hasBeenProcessed(uniqueEventId)) {
+            // We have seen this before. Burn the duplicate decree!
+            log.warn("Duplicate detected for Event ID: {}. Ignoring safely.", uniqueEventId);
+            return; 
+        }
+
+        // 2. Process the actual business logic safely
+        fulfillmentService.prepareShipment(event);
+
+        // 3. Mark the event as processed in the exact same transaction
+        idempotencyService.markAsProcessed(uniqueEventId);
+        
+        log.info("Successfully processed and recorded Event ID: {}", uniqueEventId);
     }
 }
